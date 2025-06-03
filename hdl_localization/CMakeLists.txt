@@ -18,6 +18,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 # find_package(pclomp REQUIRED)
 find_package(ndt_omp REQUIRED)
 find_package(fast_gicp REQUIRED)
@@ -69,6 +70,7 @@ ament_target_dependencies(${PROJECT_NAME}_lib
   sensor_msgs
   geometry_msgs
   nav_msgs
+  std_srvs
   ndt_omp
   fast_gicp
   hdl_global_localization

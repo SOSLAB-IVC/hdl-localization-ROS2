@@ -8,6 +8,8 @@ find_package(rclpy REQUIRED)
 find_package(pcl_ros REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 
 find_package(OpenCV REQUIRED)
 
@@ -48,6 +50,8 @@ ament_target_dependencies(${PROJECT_NAME}_lib
   rclcpp
   pcl_ros
   geometry_msgs
+  nav_msgs
+  std_srvs
 )
 rosidl_target_interfaces(${PROJECT_NAME}_lib
   ${PROJECT_NAME}

@@ -12,10 +12,11 @@
 #include <rclcpp/rclcpp.hpp>
 
 namespace kkl {
-  namespace alg {
-template<typename T, class System> class UnscentedKalmanFilterX;
-  }
+namespace alg {
+template <typename T, class System>
+class UnscentedKalmanFilterX;
 }
+}  // namespace kkl
 
 namespace hdl_localization {
 
@@ -27,7 +28,7 @@ class OdomSystem;
  */
 class PoseEstimator {
 public:
-  using PointT = pcl::PointXYZI;
+  using PointT = pcl::PointXYZ;
 
   /**
    * @brief constructor
@@ -37,7 +38,12 @@ public:
    * @param quat                initial orientation
    * @param cool_time_duration  during "cool time", prediction is not performed
    */
-  PoseEstimator(pcl::Registration<PointT, PointT>::Ptr& registration, const rclcpp::Time& stamp, const Eigen::Vector3f& pos, const Eigen::Quaternionf& quat, double cool_time_duration = 1.0);
+  PoseEstimator(
+    pcl::Registration<PointT, PointT>::Ptr& registration,
+    const rclcpp::Time& stamp,
+    const Eigen::Vector3f& pos,
+    const Eigen::Quaternionf& quat,
+    double cool_time_duration = 1.0);
   ~PoseEstimator();
 
   /**
@@ -86,7 +92,7 @@ private:
   rclcpp::Time init_stamp;             // when the estimator was initialized
   rclcpp::Time prev_stamp;             // when the estimator was updated last time
   rclcpp::Time last_correction_stamp;  // when the estimator performed the correction step
-  double cool_time_duration;        //
+  double cool_time_duration;           //
 
   Eigen::MatrixXf process_noise;
   std::unique_ptr<kkl::alg::UnscentedKalmanFilterX<float, PoseSystem>> ukf;
@@ -98,7 +104,7 @@ private:
   boost::optional<Eigen::Matrix4f> odom_pred_error;
 
   pcl::Registration<PointT, PointT>::Ptr registration;
-  };
+};
 
 }  // namespace hdl_localization
 

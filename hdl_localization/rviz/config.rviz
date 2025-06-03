@@ -29,7 +29,7 @@ Visualization Manager:
   Class: ""
   Displays:
     - Alpha: 0.5
-      Cell Size: 1
+      Cell Size: 10
       Class: rviz_default_plugins/Grid
       Color: 160; 160; 164
       Enabled: true
@@ -149,7 +149,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /point_cloud
+        Value: /aligned_points
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -199,25 +199,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 53.41305923461914
+      Distance: 45.221561431884766
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.5531377196311951
-        Y: 1.435699224472046
-        Z: -0.49635303020477295
+        X: 2.790024995803833
+        Y: 4.911505222320557
+        Z: -2.927955150604248
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.0253983736038208
-      Target Frame: base_scan
-      Value: Orbit (rviz_default_plugins)
-      Yaw: -1.5696066617965698
+      Pitch: 0.9847968816757202
+      Target Frame: odom
+      Value: Orbit (rviz)
+      Yaw: 4.703582286834717
     Saved: ~
 Window Geometry:
   Displays:

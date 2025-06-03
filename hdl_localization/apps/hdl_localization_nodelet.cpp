@@ -1,4 +1,4 @@
-// hdl localizaton ROS2 코드 1 
+// hdl localizaton ROS2 코드 1
 #include <mutex>
 #include <memory>
 #include <iostream>
@@ -31,18 +31,15 @@
 #include <hdl_global_localization/srv/set_global_map.hpp>
 #include <hdl_global_localization/srv/query_global_localization.hpp>
 
-
 using namespace std;
 
 namespace hdl_localization {
 
 class HdlLocalizationNodelet : public rclcpp::Node {
 public:
-  using PointT = pcl::PointXYZI;
+  using PointT = pcl::PointXYZ;
 
-  HdlLocalizationNodelet(const rclcpp::NodeOptions& options)
-  : Node("hdl_localization", options)
-  {
+  HdlLocalizationNodelet(const rclcpp::NodeOptions& options) : Node("hdl_localization", options) {
     tf_buffer = std::make_unique<tf2_ros::Buffer>(get_clock());
     tf_listener = std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
     tf_broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(this);
@@ -66,10 +63,12 @@ public:
     }
     points_sub = create_subscription<sensor_msgs::msg::PointCloud2>("/velodyne_points", 5, std::bind(&HdlLocalizationNodelet::points_callback, this, std::placeholders::_1));
 
-    auto latch_qos = rclcpp::QoS(1).transient_local();
-    globalmap_sub = create_subscription<sensor_msgs::msg::PointCloud2>("/globalmap", latch_qos, std::bind(&HdlLocalizationNodelet::globalmap_callback, this, std::placeholders::_1));
+    auto latch_qos = 10;  // rclcpp::QoS(1).transient_local();
+    globalmap_sub =
+      create_subscription<sensor_msgs::msg::PointCloud2>("/globalmap", latch_qos, std::bind(&HdlLocalizationNodelet::globalmap_callback, this, std::placeholders::_1));
 
-    initialpose_sub = create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", 8, std::bind(&HdlLocalizationNodelet::initialpose_callback, this, std::placeholders::_1));
+    initialpose_sub =
+      create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", 8, std::bind(&HdlLocalizationNodelet::initialpose_callback, this, std::placeholders::_1));
 
     pose_pub = create_publisher<nav_msgs::msg::Odometry>("/odom", 5);
     aligned_pub = create_publisher<sensor_msgs::msg::PointCloud2>("/aligned_points", 5);
@@ -101,7 +100,7 @@ public:
 
 private:
   pcl::Registration<PointT, PointT>::Ptr create_registration() {
-    if(reg_method == "NDT_OMP") {
+    if (reg_method == "NDT_OMP") {
       RCLCPP_INFO(get_logger(), "NDT_OMP is selected");
       pclomp::NormalDistributionsTransform<PointT, PointT>::Ptr ndt(new pclomp::NormalDistributionsTransform<PointT, PointT>());
       ndt->setTransformationEpsilon(0.01);
@@ -122,12 +121,12 @@ private:
         ndt->setNeighborhoodSearchMethod(pclomp::KDTREE);
       }
       return ndt;
-    } else if(reg_method.find("NDT_CUDA") != std::string::npos) {
+    } else if (reg_method.find("NDT_CUDA") != std::string::npos) {
       RCLCPP_INFO(get_logger(), "NDT_CUDA is selected");
       boost::shared_ptr<fast_gicp::NDTCuda<PointT, PointT>> ndt(new fast_gicp::NDTCuda<PointT, PointT>);
       ndt->setResolution(ndt_resolution);
 
-      if(reg_method.find("D2D") != std::string::npos) {
+      if (reg_method.find("D2D") != std::string::npos) {
         ndt->setDistanceMode(fast_gicp::NDTDistanceMode::D2D);
       } else if (reg_method.find("P2D") != std::string::npos) {
         ndt->setDistanceMode(fast_gicp::NDTDistanceMode::P2D);
@@ -145,7 +144,8 @@ private:
       } else {
         RCLCPP_WARN(get_logger(), "invalid search method was given");
       }
-      return ndt;
+      // return ndt;
+      std::shared_ptr<pcl::Registration<PointT, PointT>>(ndt.get(), [](pcl::Registration<PointT, PointT>*) {});
     }
 
     RCLCPP_ERROR_STREAM(get_logger(), "unknown registration method:" << reg_method);
@@ -155,7 +155,7 @@ private:
   void initialize_params() {
     // intialize scan matching method
     double downsample_resolution = declare_parameter<double>("downsample_resolution", 0.1);
-    boost::shared_ptr<pcl::VoxelGrid<PointT>> voxelgrid(new pcl::VoxelGrid<PointT>());
+    std::shared_ptr<pcl::VoxelGrid<PointT>> voxelgrid = std::make_shared<pcl::VoxelGrid<PointT>>();
     voxelgrid->setLeafSize(downsample_resolution, downsample_resolution, downsample_resolution);
     downsample_filter = voxelgrid;
 
@@ -171,31 +171,32 @@ private:
     bool specify_init_pose = declare_parameter<bool>("specify_init_pose", true);
     if (specify_init_pose) {
       RCLCPP_INFO(get_logger(), "initialize pose estimator with specified parameters!!");
-      pose_estimator.reset(new hdl_localization::PoseEstimator(registration,
+      pose_estimator.reset(new hdl_localization::PoseEstimator(
+        registration,
         get_clock()->now(),
         Eigen::Vector3f(declare_parameter<double>("init_pos_x", 0.0), declare_parameter<double>("init_pos_y", 0.0), declare_parameter<double>("init_pos_z", 0.0)),
-        Eigen::Quaternionf(declare_parameter<double>("init_ori_w", 1.0), declare_parameter<double>("init_ori_x", 0.0), declare_parameter<double>("init_ori_y", 0.0), declare_parameter<double>("init_ori_z", 0.0)),
-        cool_time_duration
-      ));
+        Eigen::Quaternionf(
+          declare_parameter<double>("init_ori_w", 1.0),
+          declare_parameter<double>("init_ori_x", 0.0),
+          declare_parameter<double>("init_ori_y", 0.0),
+          declare_parameter<double>("init_ori_z", 0.0)),
+        cool_time_duration));
     }
   }
 
 private:
-
   void imu_callback(const sensor_msgs::msg::Imu::ConstSharedPtr imu_msg) {
-    // RCLCPP_INFO(get_logger(), "----------------"); 
-    // RCLCPP_INFO(get_logger(), "imu_callback"); 
-    // RCLCPP_INFO(get_logger(), "----------------"); 
+    // RCLCPP_INFO(get_logger(), "----------------");
+    // RCLCPP_INFO(get_logger(), "imu_callback");
+    // RCLCPP_INFO(get_logger(), "----------------");
     std::lock_guard<std::mutex> lock(imu_data_mutex);
     imu_data.push_back(imu_msg);
   }
 
-
   void points_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr points_msg) {
-    // RCLCPP_INFO(get_logger(), ""); 
-    // RCLCPP_INFO(get_logger(), "points_callback"); 
-    // RCLCPP_INFO(get_logger(), ""); 
-
+    // RCLCPP_INFO(get_logger(), "");
+    // RCLCPP_INFO(get_logger(), "points_callback");
+    // RCLCPP_INFO(get_logger(), "");
 
     std::lock_guard<std::mutex> estimator_lock(pose_estimator_mutex);
     if (!pose_estimator) {
@@ -222,8 +223,8 @@ private:
     // transform pointcloud into odom_child_frame_id
     pcl::PointCloud<PointT>::Ptr cloud(new pcl::PointCloud<PointT>());
     if (!pcl_ros::transformPointCloud(odom_child_frame_id, *pcl_cloud, *cloud, *tf_buffer)) {
-        RCLCPP_ERROR(get_logger(), "point cloud cannot be transformed into target frame!!");
-        return;
+      RCLCPP_ERROR(get_logger(), "point cloud cannot be transformed into target frame!!");
+      return;
     }
 
     auto filtered = downsample(cloud);
@@ -239,7 +240,6 @@ private:
     if (!use_imu) {
       pose_estimator->predict(stamp);
     } else {
-      
       std::lock_guard<std::mutex> lock(imu_data_mutex);
       // RCLCPP_INFO(get_logger(),"imu size is : %d ", imu_data.size());
       auto imu_iter = imu_data.begin();
@@ -261,12 +261,25 @@ private:
     if (enable_robot_odometry_prediction && last_correction_time != rclcpp::Time((int64_t)0, get_clock()->get_clock_type())) {
       geometry_msgs::msg::TransformStamped odom_delta;
       if (tf_buffer->canTransform(odom_child_frame_id, last_correction_time, odom_child_frame_id, stamp, robot_odom_frame_id, rclcpp::Duration(std::chrono::milliseconds(100)))) {
-        odom_delta = tf_buffer->lookupTransform(odom_child_frame_id, last_correction_time, odom_child_frame_id, stamp, robot_odom_frame_id, rclcpp::Duration(std::chrono::milliseconds(0)));
-      } else if(tf_buffer->canTransform(odom_child_frame_id, last_correction_time, odom_child_frame_id, rclcpp::Time((int64_t)0, get_clock()->get_clock_type()), robot_odom_frame_id, rclcpp::Duration(std::chrono::milliseconds(0)))) {
-        odom_delta = tf_buffer->lookupTransform(odom_child_frame_id, last_correction_time, odom_child_frame_id, rclcpp::Time((int64_t)0, get_clock()->get_clock_type()), robot_odom_frame_id, rclcpp::Duration(std::chrono::milliseconds(0)));
+        odom_delta =
+          tf_buffer->lookupTransform(odom_child_frame_id, last_correction_time, odom_child_frame_id, stamp, robot_odom_frame_id, rclcpp::Duration(std::chrono::milliseconds(0)));
+      } else if (tf_buffer->canTransform(
+                   odom_child_frame_id,
+                   last_correction_time,
+                   odom_child_frame_id,
+                   rclcpp::Time((int64_t)0, get_clock()->get_clock_type()),
+                   robot_odom_frame_id,
+                   rclcpp::Duration(std::chrono::milliseconds(0)))) {
+        odom_delta = tf_buffer->lookupTransform(
+          odom_child_frame_id,
+          last_correction_time,
+          odom_child_frame_id,
+          rclcpp::Time((int64_t)0, get_clock()->get_clock_type()),
+          robot_odom_frame_id,
+          rclcpp::Duration(std::chrono::milliseconds(0)));
       }
 
-      if(odom_delta.header.stamp == rclcpp::Time((int64_t)0, get_clock()->get_clock_type())) {
+      if (odom_delta.header.stamp == rclcpp::Time((int64_t)0, get_clock()->get_clock_type())) {
         RCLCPP_WARN_STREAM(get_logger(), "failed to look up transform between " << cloud->header.frame_id << " and " << robot_odom_frame_id);
       } else {
         Eigen::Isometry3d delta = tf2::transformToEigen(odom_delta);
@@ -278,7 +291,7 @@ private:
     // correct
     auto aligned = pose_estimator->correct(stamp, filtered);
 
-    if(aligned_pub->get_subscription_count()) {
+    if (aligned_pub->get_subscription_count()) {
       aligned->header.frame_id = "map";
       aligned->header.stamp = cloud->header.stamp;
       sensor_msgs::msg::PointCloud2 aligned_msg;
@@ -286,15 +299,15 @@ private:
       aligned_pub->publish(aligned_msg);
     }
 
-    if(status_pub->get_subscription_count()) {
+    if (status_pub->get_subscription_count()) {
       publish_scan_matching_status(points_msg->header, aligned);
     }
 
     publish_odometry(points_msg->header.stamp, pose_estimator->matrix());
 
-    // RCLCPP_INFO(get_logger(), ""); 
-    // RCLCPP_INFO(get_logger(), "----------finish points callback------------"); 
-    // RCLCPP_INFO(get_logger(), ""); 
+    // RCLCPP_INFO(get_logger(), "");
+    // RCLCPP_INFO(get_logger(), "----------finish points callback------------");
+    // RCLCPP_INFO(get_logger(), "");
   }
 
   /**
@@ -311,12 +324,11 @@ private:
     pcl::fromROSMsg(*points_msg, *cloud);
     globalmap = cloud;
 
-
     registration->setInputTarget(globalmap);
 
-    if(use_global_localization) {
+    if (use_global_localization) {
       RCLCPP_INFO(get_logger(), "set globalmap for global localization!");
-      auto req  = std::make_shared<hdl_global_localization::srv::SetGlobalMap::Request>();
+      auto req = std::make_shared<hdl_global_localization::srv::SetGlobalMap::Request>();
       pcl::toROSMsg(*globalmap, req->global_map);
       auto result = set_global_map_service->async_send_request(req);
       if (rclcpp::spin_until_future_complete(rclcpp::Node::SharedPtr(this), result) != rclcpp::FutureReturnCode::SUCCESS) {
@@ -330,7 +342,7 @@ private:
    * @param
    */
   bool relocalize(std::shared_ptr<std_srvs::srv::Empty::Request> req, std::shared_ptr<std_srvs::srv::Empty::Response> res) {
-    if(last_scan == nullptr) {
+    if (last_scan == nullptr) {
       RCLCPP_INFO_STREAM(get_logger(), "no scan has been received");
       return false;
     }
@@ -339,7 +351,7 @@ private:
     delta_estimater->reset();
     pcl::PointCloud<PointT>::ConstPtr scan = last_scan;
 
-    auto query_req  = std::make_shared<hdl_global_localization::srv::QueryGlobalLocalization::Request>();
+    auto query_req = std::make_shared<hdl_global_localization::srv::QueryGlobalLocalization::Request>();
     pcl::toROSMsg(*scan, query_req->cloud);
     query_req->max_num_candidates = 1;
 
@@ -369,12 +381,8 @@ private:
     pose = pose * delta_estimater->estimated_delta();
 
     std::lock_guard<std::mutex> lock(pose_estimator_mutex);
-    pose_estimator.reset(new hdl_localization::PoseEstimator(
-      registration,
-      get_clock()->now(),
-      pose.translation(),
-      Eigen::Quaternionf(pose.linear()),
-      cool_time_duration));
+    pose_estimator.reset(
+      new hdl_localization::PoseEstimator(registration, get_clock()->now(), Eigen::Vector3f(pose.translation()), Eigen::Quaternionf(pose.linear()), cool_time_duration));
 
     relocalizing = false;
 
@@ -391,18 +399,11 @@ private:
     const auto& p = pose_msg->pose.pose.position;
     const auto& q = pose_msg->pose.pose.orientation;
     pose_estimator.reset(
-          new hdl_localization::PoseEstimator(
-            registration,
-            get_clock()->now(),
-            Eigen::Vector3f(p.x, p.y, p.z),
-            Eigen::Quaternionf(q.w, q.x, q.y, q.z),
-            cool_time_duration)
-    );
+      new hdl_localization::PoseEstimator(registration, get_clock()->now(), Eigen::Vector3f(p.x, p.y, p.z), Eigen::Quaternionf(q.w, q.x, q.y, q.z), cool_time_duration));
   }
 
-
   pcl::PointCloud<PointT>::ConstPtr downsample(const pcl::PointCloud<PointT>::ConstPtr& cloud) const {
-    if(!downsample_filter) {
+    if (!downsample_filter) {
       return cloud;
     }
 
@@ -416,14 +417,18 @@ private:
 
   void publish_odometry(const rclcpp::Time& stamp, const Eigen::Matrix4f& pose) {
     // broadcast the transform over tf
-    if(send_tf_transforms) {
-      if(tf_buffer->canTransform(robot_odom_frame_id, odom_child_frame_id, rclcpp::Time((int64_t)0, get_clock()->get_clock_type()))) {
+    if (send_tf_transforms) {
+      if (tf_buffer->canTransform(robot_odom_frame_id, odom_child_frame_id, rclcpp::Time((int64_t)0, get_clock()->get_clock_type()))) {
         geometry_msgs::msg::TransformStamped map_wrt_frame = tf2::eigenToTransform(Eigen::Isometry3d(pose.inverse().cast<double>()));
         map_wrt_frame.header.stamp = stamp;
         map_wrt_frame.header.frame_id = odom_child_frame_id;
         map_wrt_frame.child_frame_id = "map";
 
-        geometry_msgs::msg::TransformStamped frame_wrt_odom = tf_buffer->lookupTransform(robot_odom_frame_id, odom_child_frame_id, rclcpp::Time((int64_t)0, get_clock()->get_clock_type()), rclcpp::Duration(std::chrono::milliseconds(100)));
+        geometry_msgs::msg::TransformStamped frame_wrt_odom = tf_buffer->lookupTransform(
+          robot_odom_frame_id,
+          odom_child_frame_id,
+          rclcpp::Time((int64_t)0, get_clock()->get_clock_type()),
+          rclcpp::Duration(std::chrono::milliseconds(100)));
         Eigen::Matrix4f frame2odom = tf2::transformToEigen(frame_wrt_odom).cast<float>().matrix();
 
         geometry_msgs::msg::TransformStamped map_wrt_odom;
@@ -467,7 +472,7 @@ private:
     pose_pub->publish(odom);
   }
 
-  void publish_scan_matching_status(const std_msgs::msg::Header& header, pcl::PointCloud<pcl::PointXYZI>::ConstPtr aligned) {
+  void publish_scan_matching_status(const std_msgs::msg::Header& header, pcl::PointCloud<PointT>::ConstPtr aligned) {
     msg::ScanMatchingStatus status;
     status.header = header;
 
@@ -479,10 +484,10 @@ private:
     int num_inliers = 0;
     std::vector<int> k_indices;
     std::vector<float> k_sq_dists;
-    for(int i = 0; i < aligned->size(); i++) {
+    for (int i = 0; i < aligned->size(); i++) {
       const auto& pt = aligned->at(i);
       registration->getSearchMethodTarget()->nearestKSearch(pt, 1, k_indices, k_sq_dists);
-      if(k_sq_dists[0] < max_correspondence_dist * max_correspondence_dist) {
+      if (k_sq_dists[0] < max_correspondence_dist * max_correspondence_dist) {
         num_inliers++;
       }
     }
@@ -494,19 +499,19 @@ private:
 
     std::vector<double> errors(6, 0.0);
 
-    if(pose_estimator->wo_prediction_error()) {
+    if (pose_estimator->wo_prediction_error()) {
       status.prediction_labels.push_back(std_msgs::msg::String());
       status.prediction_labels.back().data = "without_pred";
       status.prediction_errors.push_back(tf2::eigenToTransform(Eigen::Isometry3d(pose_estimator->wo_prediction_error().get().cast<double>())).transform);
     }
 
-    if(pose_estimator->imu_prediction_error()) {
+    if (pose_estimator->imu_prediction_error()) {
       status.prediction_labels.push_back(std_msgs::msg::String());
       status.prediction_labels.back().data = use_imu ? "imu" : "motion_model";
       status.prediction_errors.push_back(tf2::eigenToTransform(Eigen::Isometry3d(pose_estimator->imu_prediction_error().get().cast<double>())).transform);
     }
 
-    if(pose_estimator->odom_prediction_error()) {
+    if (pose_estimator->odom_prediction_error()) {
       status.prediction_labels.push_back(std_msgs::msg::String());
       status.prediction_labels.back().data = "odom";
       status.prediction_errors.push_back(tf2::eigenToTransform(Eigen::Isometry3d(pose_estimator->odom_prediction_error().get().cast<double>())).transform);
@@ -568,7 +573,7 @@ private:
   double ndt_resolution;
   bool enable_robot_odometry_prediction;
 };
-}
+}  // namespace hdl_localization
 
 #include "rclcpp_components/register_node_macro.hpp"
 RCLCPP_COMPONENTS_REGISTER_NODE(hdl_localization::HdlLocalizationNodelet)
