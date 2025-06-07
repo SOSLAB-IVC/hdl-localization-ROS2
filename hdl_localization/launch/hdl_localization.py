@@ -7,10 +7,8 @@ import launch_ros.actions
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 
-from ament_index_python.packages import get_package_share_directory
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument
 
 def generate_launch_description():
 
@@ -87,13 +85,4 @@ def generate_launch_description():
         output='screen',   
     )
     
-    rviz_config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'rviz', 'config.rviz')
-    rviz_node = Node(
-        name = 'rviz2',
-        package = 'rviz2',
-        executable = 'rviz2',
-        output = 'screen',
-        arguments = ['-d', rviz_config_file],
-    )
-
-    return LaunchDescription([globalmap_pcd, launch_ros.actions.SetParameter(name='use_sim_time', value=True), lidar_tf, rviz_node, container])
+    return LaunchDescription([globalmap_pcd, launch_ros.actions.SetParameter(name='use_sim_time', value=True), lidar_tf, container])
