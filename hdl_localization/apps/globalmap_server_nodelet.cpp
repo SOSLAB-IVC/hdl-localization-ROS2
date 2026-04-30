@@ -25,10 +25,15 @@ public:
   : Node("map_server", options) {
     initialize_params();
 
-    // publish globalmap with "latched" publisher
-    auto latch_qos = 10;  // rclcpp::QoS(1).transient_local();
+    // publish globalmap with "latched" (transient_local) QoS so late subscribers still get it
+    auto latch_qos = rclcpp::QoS(1).transient_local();
     globalmap_pub = create_publisher<sensor_msgs::msg::PointCloud2>("/globalmap", latch_qos);
-    globalmap_pub_timer = create_wall_timer(std::chrono::milliseconds(5000), std::bind(&GlobalmapServerNodelet::pub_once_cb, this));
+
+    // publish the map once at startup; transient_local QoS keeps it cached for late joiners
+    globalmap_msg = std::make_shared<sensor_msgs::msg::PointCloud2>();
+    pcl::toROSMsg(*globalmap, *globalmap_msg);
+    globalmap_pub->publish(*globalmap_msg);
+    RCLCPP_INFO(get_logger(), "Globalmap published once (latched, transient_local).");
 
     ////***************************start pyc modified***************************/
     map_update_sub =
@@ -48,7 +53,7 @@ private:
 
     // downsample globalmap
     double downsample_resolution = declare_parameter<double>("downsample_resolution", 0.1);
-    boost::shared_ptr<pcl::VoxelGrid<PointT>> voxelgrid(new pcl::VoxelGrid<PointT>());
+    std::shared_ptr<pcl::VoxelGrid<PointT>> voxelgrid(new pcl::VoxelGrid<PointT>());
     voxelgrid->setLeafSize(downsample_resolution, downsample_resolution, downsample_resolution);
     voxelgrid->setInputCloud(globalmap);
 
@@ -56,9 +61,12 @@ private:
     voxelgrid->filter(*filtered);
 
     globalmap = filtered;
-    // sensor_msgs::msg::PointCloud2 globalmap_msg;
-    // pcl::toROSMsg(*globalmap, globalmap_msg);
-    // globalmap_pub->publish(globalmap_msg);
+
+    // Republish updated map (latched QoS keeps last value cached)
+    globalmap_msg = std::make_shared<sensor_msgs::msg::PointCloud2>();
+    pcl::toROSMsg(*globalmap, *globalmap_msg);
+    globalmap_pub->publish(*globalmap_msg);
+    RCLCPP_INFO(get_logger(), "Globalmap updated and republished.");
   }
   /***************************end pyc modified***************************/  ///
 
@@ -99,7 +107,7 @@ private:
 
     // downsample globalmap
     double downsample_resolution = declare_parameter<double>("downsample_resolution", 0.1);
-    boost::shared_ptr<pcl::VoxelGrid<PointT>> voxelgrid(new pcl::VoxelGrid<PointT>());
+    std::shared_ptr<pcl::VoxelGrid<PointT>> voxelgrid(new pcl::VoxelGrid<PointT>());
     voxelgrid->setLeafSize(downsample_resolution, downsample_resolution, downsample_resolution);
     voxelgrid->setInputCloud(globalmap);
 

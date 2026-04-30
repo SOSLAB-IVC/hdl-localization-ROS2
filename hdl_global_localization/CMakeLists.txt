@@ -12,6 +12,7 @@ find_package(nav_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 
 find_package(OpenCV REQUIRED)
+find_package(PCL REQUIRED COMPONENTS common features registration filters search kdtree)
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -65,6 +66,7 @@ target_include_directories(
 )
 target_link_libraries(${PROJECT_NAME}_lib
   ${OpenCV_LIBS}
+  ${PCL_LIBRARIES}
 )
 rclcpp_components_register_node(${PROJECT_NAME}_lib
   PLUGIN "${PROJECT_NAME}::GlobalLocalizationNode"

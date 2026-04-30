@@ -6,12 +6,12 @@
 #include <rclcpp/rclcpp.hpp>
 #include <pcl_ros/transforms.hpp>
 #include <pcl_conversions/pcl_conversions.h>
-#include <tf2_eigen/tf2_eigen.h>
+#include <tf2_eigen/tf2_eigen.hpp>
 
-#include <tf2_eigen/tf2_eigen.h>
+#include <tf2_eigen/tf2_eigen.hpp>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/transform_broadcaster.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 #include <std_srvs/srv/empty.hpp>
 #include <sensor_msgs/msg/imu.hpp>
@@ -22,7 +22,9 @@
 #include <pcl/filters/voxel_grid.h>
 
 #include <pclomp/ndt_omp.h>
+#ifdef USE_NDT_CUDA
 #include <fast_gicp/ndt/ndt_cuda.hpp>
+#endif
 
 #include <hdl_localization/pose_estimator.hpp>
 #include <hdl_localization/delta_estimater.hpp>
@@ -63,7 +65,7 @@ public:
     }
     points_sub = create_subscription<sensor_msgs::msg::PointCloud2>("/velodyne_points", 5, std::bind(&HdlLocalizationNodelet::points_callback, this, std::placeholders::_1));
 
-    auto latch_qos = 10;  // rclcpp::QoS(1).transient_local();
+    auto latch_qos = rclcpp::QoS(1).transient_local();
     globalmap_sub =
       create_subscription<sensor_msgs::msg::PointCloud2>("/globalmap", latch_qos, std::bind(&HdlLocalizationNodelet::globalmap_callback, this, std::placeholders::_1));
 
@@ -122,8 +124,9 @@ private:
       }
       return ndt;
     } else if (reg_method.find("NDT_CUDA") != std::string::npos) {
+#ifdef USE_NDT_CUDA
       RCLCPP_INFO(get_logger(), "NDT_CUDA is selected");
-      boost::shared_ptr<fast_gicp::NDTCuda<PointT, PointT>> ndt(new fast_gicp::NDTCuda<PointT, PointT>);
+      std::shared_ptr<fast_gicp::NDTCuda<PointT, PointT>> ndt(new fast_gicp::NDTCuda<PointT, PointT>);
       ndt->setResolution(ndt_resolution);
 
       if (reg_method.find("D2D") != std::string::npos) {
@@ -146,6 +149,9 @@ private:
       }
       // return ndt;
       std::shared_ptr<pcl::Registration<PointT, PointT>>(ndt.get(), [](pcl::Registration<PointT, PointT>*) {});
+#else
+      RCLCPP_ERROR(get_logger(), "NDT_CUDA was selected but the package was built without CUDA support. Use NDT_OMP instead.");
+#endif
     }
 
     RCLCPP_ERROR_STREAM(get_logger(), "unknown registration method:" << reg_method);

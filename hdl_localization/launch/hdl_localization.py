@@ -11,42 +11,123 @@ from launch.actions import DeclareLaunchArgument
 
 def generate_launch_description():
 
-    # Importtant, required arguments
-    points_topic = LaunchConfiguration("points_topic", default="/point_cloud")
-    odom_child_frame_id = LaunchConfiguration(
-        "odom_child_frame_id", default="base_scan"
+    # ===== Topics =====
+    points_topic_arg = DeclareLaunchArgument(
+        "points_topic",
+        default_value="/ac1/pointcloud",
+        description="LiDAR point cloud topic",
     )
-    imu_topic = LaunchConfiguration("imu_topic", default="/imu")
-    globalmap_pcd = DeclareLaunchArgument(
+    imu_topic_arg = DeclareLaunchArgument(
+        "imu_topic",
+        default_value="/ac1/imu",
+        description="IMU topic",
+    )
+
+    # ===== Frames =====
+    odom_child_frame_id_arg = DeclareLaunchArgument(
+        "odom_child_frame_id",
+        default_value="ac1_lidar",
+        description="Sensor / base frame to which the point cloud will be transformed",
+    )
+    robot_odom_frame_id_arg = DeclareLaunchArgument(
+        "robot_odom_frame_id",
+        default_value="odom",
+        description="Robot odom frame (parent of odom_child_frame_id)",
+    )
+
+    # ===== Map =====
+    globalmap_pcd_arg = DeclareLaunchArgument(
         "globalmap_pcd",
-        default_value="/root/ros2_ws/src/map.pcd",
+        default_value="/root/ros2_ws/src/map_publisher/maps/raw_map.pcd",
         description="Path to the global map PCD file",
     )
 
-    # arguments
-    use_sim_time = LaunchConfiguration("use_sim_time", default="true")
-
-    # optional arguments
-    use_imu = LaunchConfiguration("use_imu", default="true")
-    invert_imu_acc = LaunchConfiguration("invert_imu_acc", default="false")
-    invert_imu_gyro = LaunchConfiguration("invert_imu_gyro", default="false")
-    use_global_localization = LaunchConfiguration(
-        "use_global_localization", default="false"
+    # ===== Lidar -> IMU offset (AC1 device) =====
+    lidar_to_imu_x_arg = DeclareLaunchArgument(
+        "lidar_to_imu_x", default_value="-0.0106"
     )
+    lidar_to_imu_y_arg = DeclareLaunchArgument(
+        "lidar_to_imu_y", default_value="-0.0099"
+    )
+    lidar_to_imu_z_arg = DeclareLaunchArgument("lidar_to_imu_z", default_value="0.0155")
+
+    # ===== Optional flags =====
+    use_imu_arg = DeclareLaunchArgument("use_imu", default_value="true")
+    invert_imu_acc_arg = DeclareLaunchArgument("invert_imu_acc", default_value="false")
+    invert_imu_gyro_arg = DeclareLaunchArgument(
+        "invert_imu_gyro", default_value="false"
+    )
+    use_global_localization_arg = DeclareLaunchArgument(
+        "use_global_localization", default_value="false"
+    )
+    enable_robot_odometry_prediction_arg = DeclareLaunchArgument(
+        "enable_robot_odometry_prediction", default_value="false"
+    )
+
+    points_topic = LaunchConfiguration("points_topic")
+    imu_topic = LaunchConfiguration("imu_topic")
+    odom_child_frame_id = LaunchConfiguration("odom_child_frame_id")
+    robot_odom_frame_id = LaunchConfiguration("robot_odom_frame_id")
+    use_imu = LaunchConfiguration("use_imu")
+    invert_imu_acc = LaunchConfiguration("invert_imu_acc")
+    invert_imu_gyro = LaunchConfiguration("invert_imu_gyro")
+    use_global_localization = LaunchConfiguration("use_global_localization")
     enable_robot_odometry_prediction = LaunchConfiguration(
-        "enable_robot_odometry_prediction", default="false"
-    )
-    robot_odom_frame_id = LaunchConfiguration("robot_odom_frame_id", default="odom")
-    plot_estimation_errors = LaunchConfiguration(
-        "plot_estimation_errors", default="false"
+        "enable_robot_odometry_prediction"
     )
 
-    # optional tf arguments
-    lidar_tf = Node(
-        name="lidar_tf",
+    # ===== Static TFs =====
+    # odom -> ac1_lidar (identity). hdl_localization re-publishes map -> odom on top of this.
+    odom_to_lidar_tf = Node(
+        name="odom_to_lidar_tf",
         package="tf2_ros",
         executable="static_transform_publisher",
-        arguments=["0.0", "0.0", "0.0", "0", "0", "0", "1", "odom", "base_scan"],
+        arguments=[
+            "--x",
+            "0",
+            "--y",
+            "0",
+            "--z",
+            "0",
+            "--qx",
+            "0",
+            "--qy",
+            "0",
+            "--qz",
+            "0",
+            "--qw",
+            "1",
+            "--frame-id",
+            "odom",
+            "--child-frame-id",
+            "ac1_lidar",
+        ],
+    )
+    # ac1_lidar -> ac1_imu (extrinsic from AC1 driver)
+    lidar_to_imu_tf = Node(
+        name="lidar_to_imu_tf",
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=[
+            "--x",
+            LaunchConfiguration("lidar_to_imu_x"),
+            "--y",
+            LaunchConfiguration("lidar_to_imu_y"),
+            "--z",
+            LaunchConfiguration("lidar_to_imu_z"),
+            "--qx",
+            "0",
+            "--qy",
+            "0",
+            "--qz",
+            "0",
+            "--qw",
+            "1",
+            "--frame-id",
+            "ac1_lidar",
+            "--child-frame-id",
+            "ac1_imu",
+        ],
     )
 
     container = ComposableNodeContainer(
@@ -61,8 +142,8 @@ def generate_launch_description():
                 name="GlobalmapServerNodelet",
                 parameters=[
                     {"globalmap_pcd": LaunchConfiguration("globalmap_pcd")},
-                    {"convert_utm_to_local": True},
-                    {"downsample_resolution": 0.1},
+                    {"convert_utm_to_local": False},
+                    {"downsample_resolution": 0.05},
                 ],
             ),
             ComposableNode(
@@ -87,16 +168,16 @@ def generate_launch_description():
                     {"reg_method": "NDT_OMP"},
                     {"ndt_neighbor_search_method": "DIRECT7"},
                     {"ndt_neighbor_search_radius": 1.0},
-                    {"ndt_resolution": 0.5},
-                    {"downsample_resolution": 0.1},
+                    {"ndt_resolution": 1.0},
+                    {"downsample_resolution": 0.05},
                     {"specify_init_pose": True},
-                    {"init_pos_x": -2.91273},
-                    {"init_pos_y": -2.13794},
+                    {"init_pos_x": 0.0},
+                    {"init_pos_y": 0.0},
                     {"init_pos_z": 0.0},
-                    {"init_ori_w": 0.997169},
+                    {"init_ori_w": 1.0},
                     {"init_ori_x": 0.0},
                     {"init_ori_y": 0.0},
-                    {"init_ori_z": -0.0751977},
+                    {"init_ori_z": 0.0},
                     {"use_global_localization": use_global_localization},
                 ],
             ),
@@ -106,9 +187,22 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            globalmap_pcd,
+            points_topic_arg,
+            imu_topic_arg,
+            odom_child_frame_id_arg,
+            robot_odom_frame_id_arg,
+            globalmap_pcd_arg,
+            lidar_to_imu_x_arg,
+            lidar_to_imu_y_arg,
+            lidar_to_imu_z_arg,
+            use_imu_arg,
+            invert_imu_acc_arg,
+            invert_imu_gyro_arg,
+            use_global_localization_arg,
+            enable_robot_odometry_prediction_arg,
             launch_ros.actions.SetParameter(name="use_sim_time", value=True),
-            lidar_tf,
+            odom_to_lidar_tf,
+            lidar_to_imu_tf,
             container,
         ]
     )
