@@ -38,7 +38,7 @@ def generate_launch_description():
     # ===== Map =====
     globalmap_pcd_arg = DeclareLaunchArgument(
         "globalmap_pcd",
-        default_value="/root/ros2_ws/src/map_publisher/maps/raw_map.pcd",
+        default_value="/root/ros2_ws/src/q_gist_office_ac1.pcd",
         description="Path to the global map PCD file",
     )
 
@@ -143,7 +143,7 @@ def generate_launch_description():
                 parameters=[
                     {"globalmap_pcd": LaunchConfiguration("globalmap_pcd")},
                     {"convert_utm_to_local": False},
-                    {"downsample_resolution": 0.05},
+                    {"downsample_resolution": 0.1},
                 ],
             ),
             ComposableNode(
@@ -169,7 +169,7 @@ def generate_launch_description():
                     {"ndt_neighbor_search_method": "DIRECT7"},
                     {"ndt_neighbor_search_radius": 1.0},
                     {"ndt_resolution": 1.0},
-                    {"downsample_resolution": 0.05},
+                    {"downsample_resolution": 0.1},
                     {"specify_init_pose": True},
                     {"init_pos_x": 0.0},
                     {"init_pos_y": 0.0},
