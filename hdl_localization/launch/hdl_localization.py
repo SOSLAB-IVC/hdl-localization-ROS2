@@ -52,7 +52,7 @@ def generate_launch_description():
     lidar_to_imu_z_arg = DeclareLaunchArgument("lidar_to_imu_z", default_value="0.0155")
 
     # ===== Optional flags =====
-    use_imu_arg = DeclareLaunchArgument("use_imu", default_value="true")
+    use_imu_arg = DeclareLaunchArgument("use_imu", default_value="false")
     invert_imu_acc_arg = DeclareLaunchArgument("invert_imu_acc", default_value="false")
     invert_imu_gyro_arg = DeclareLaunchArgument(
         "invert_imu_gyro", default_value="false"
