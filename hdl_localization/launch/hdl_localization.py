@@ -170,7 +170,7 @@ def generate_launch_description():
                     {"ndt_neighbor_search_radius": 1.0},
                     {"ndt_resolution": 1.0},
                     {"downsample_resolution": 0.1},
-                    {"specify_init_pose": True},
+                    {"specify_init_pose": False},
                     {"init_pos_x": 0.0},
                     {"init_pos_y": 0.0},
                     {"init_pos_z": 0.0},
